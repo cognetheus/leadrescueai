@@ -68,7 +68,7 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
   const source = new MetaSourceClient(config.SIMULATOR_BASE_URL, config.HTTP_TIMEOUT_MS);
   const crm = new CrmClient(config.SIMULATOR_BASE_URL, config.HTTP_TIMEOUT_MS);
   const credentials = new CredentialService(repos);
-  const pipeline = new DeliveryPipeline({ db, repos, clock, logger, source, crm, credentials });
+  const pipeline = new DeliveryPipeline({ db, repos, clock, logger, source, crm, credentials, leaseHeld: (jobId, token) => queue.holdsLease(jobId, token) });
   const incidents = new IncidentService(repos, queue, { assessRecovered: config.AI_ASSESS_RECOVERED });
   const failureHandler = new BoundedRetryFailureHandler(repos, incidents, clock, {
     maxAttempts: config.RETRY_MAX_ATTEMPTS, baseDelayMs: config.RETRY_BASE_DELAY_MS, maxDelayMs: config.RETRY_MAX_DELAY_MS, deadlineMs: config.DELIVERY_DEADLINE_MS,

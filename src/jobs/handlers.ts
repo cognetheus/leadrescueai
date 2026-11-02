@@ -17,6 +17,10 @@ export function deliverLeadHandler(container: Container, mastra: Mastra): JobHan
       container.logger.info('Delivery job skipped', { deliveryId, reason: begun.reason });
       return { type: 'complete' };
     }
+    if (begun.kind === 'busy') {
+      container.logger.info('Delivery already in progress elsewhere; deferring', { deliveryId, reason: begun.reason });
+      return { type: 'reschedule', runAfter: container.clock.now() + container.config.JOB_LEASE_MS, reason: begun.reason };
+    }
     if (begun.interruptedAttempts.length) {
       container.services.incidents.recordInterruption(begun.ctx, begun.interruptedAttempts);
       container.logger.warn('Recovered delivery from an interrupted worker', { deliveryId, interrupted: begun.interruptedAttempts.map((a) => a.id) });

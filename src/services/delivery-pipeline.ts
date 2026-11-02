@@ -28,7 +28,9 @@ export interface AttemptContext {
 
 export type BeginResult =
   | { kind: 'run'; ctx: AttemptContext; interruptedAttempts: DeliveryAttempt[] }
-  | { kind: 'skip'; reason: string; delivery: Delivery };
+  | { kind: 'skip'; reason: string; delivery: Delivery }
+  /** Another live lease is already working on this delivery (single-flight per delivery). */
+  | { kind: 'busy'; reason: string; delivery: Delivery };
 
 export type ContactOrigin = 'existing' | 'created' | 'prior_attempt';
 
@@ -40,6 +42,8 @@ export interface PipelineDeps {
   source: MetaSourceClient;
   crm: CrmClient;
   credentials: CredentialService;
+  /** Lease ownership check for attempts started by other jobs (delivery-level fencing). */
+  leaseHeld: (jobId: string, leaseToken: string) => boolean;
 }
 
 /** Fields that must round-trip unchanged through the CRM for a delivery to count. */
@@ -74,7 +78,10 @@ export class DeliveryPipeline {
       if (delivery.status === 'delivered' || delivery.status === 'escalated') {
         return { kind: 'skip', reason: `delivery already ${delivery.status}`, delivery };
       }
-      const interruptedAttempts = repos.attempts.running(delivery.id);
+      const running = repos.attempts.running(delivery.id);
+      const live = running.find((a) => a.jobId && a.leaseToken && a.leaseToken !== fence.leaseToken && this.deps.leaseHeld(a.jobId, a.leaseToken));
+      if (live) return { kind: 'busy', reason: `attempt ${live.id} is in progress on ${live.workerId}`, delivery };
+      const interruptedAttempts = running;
       for (const a of interruptedAttempts) {
         repos.attempts.finish(a.id, 'abandoned', {
           failureClass: 'transient', code: 'worker_interrupted', stage: a.stageReached ?? 'load',
