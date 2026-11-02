@@ -1,0 +1,26 @@
+diff --git a/dist/constants-BhFCmvqk.js b/dist/constants-BhFCmvqk.js
+index fd747dc07512fdb27d27c1d21411188dee850cbe..d1ab7491fa8778ba20efdc580ca66b7175faadc9 100644
+--- a/dist/constants-BhFCmvqk.js
++++ b/dist/constants-BhFCmvqk.js
+@@ -917,7 +917,7 @@ function buildInputPreview(input, maxLength = 100) {
+ }
+ /** Stored preview when the record carries one (`''` means none), else one built from the value. */
+ function lightPreview(stored, value) {
+-	return stored == null ? buildPreview(value) : stored.trim() || null;
++	return stored == null ? buildPreview(value) : (typeof stored === "string" ? stored : JSON.stringify(stored)).trim() || null;
+ }
+ /**
+ * Projects a full span record down to the lightweight row a trace list renders,
+diff --git a/dist/constants-CfoC1R5a.cjs b/dist/constants-CfoC1R5a.cjs
+index fc94877230caf1897c87bd2c141444f4e4305852..aca82954f1ae8e5ac754a5b0d298d00420b8d661 100644
+--- a/dist/constants-CfoC1R5a.cjs
++++ b/dist/constants-CfoC1R5a.cjs
+@@ -917,7 +917,7 @@ function buildInputPreview(input, maxLength = 100) {
+ }
+ /** Stored preview when the record carries one (`''` means none), else one built from the value. */
+ function lightPreview(stored, value) {
+-	return stored == null ? buildPreview(value) : stored.trim() || null;
++	return stored == null ? buildPreview(value) : (typeof stored === "string" ? stored : JSON.stringify(stored)).trim() || null;
+ }
+ /**
+ * Projects a full span record down to the lightweight row a trace list renders,
