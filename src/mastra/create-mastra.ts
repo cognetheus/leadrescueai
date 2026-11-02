@@ -6,6 +6,7 @@ import type { AppConfig } from '../config/env';
 import { createMastraLogger } from '../shared/logger';
 import { incidentAnalystAgent } from './agents/incident-analyst';
 import { deliveryRemediationWorkflow } from './workflows/delivery-remediation';
+import { incidentAnalysisWorkflow } from './workflows/incident-analysis';
 import { leadDeliveryWorkflow } from './workflows/lead-delivery';
 import { platformHeartbeatWorkflow } from './workflows/platform-heartbeat';
 import { sourceReconciliationWorkflow } from './workflows/source-reconciliation';
@@ -22,6 +23,7 @@ export const workflows = {
   leadDeliveryWorkflow,
   deliveryRemediationWorkflow,
   sourceReconciliationWorkflow,
+  incidentAnalysisWorkflow,
 };
 
 /**

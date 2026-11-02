@@ -107,6 +107,23 @@ export function tracingFor(ctx: AttemptContext, jobId: string) {
   };
 }
 
+/** Runs Workflow D for an incident. Independent of delivery: its failure never affects leads. */
+export function analyzeIncidentHandler(container: Container, mastra: Mastra): JobHandler {
+  return async (lease) => {
+    const { incidentId } = lease.job.payload as { incidentId: string };
+    const requestContext = new RequestContext();
+    requestContext.set(CONTAINER_KEY, containerRef(container));
+    const run = await mastra.getWorkflow('incidentAnalysisWorkflow').createRun({ resourceId: lease.job.tenantId ?? undefined });
+    const result = await run.start({
+      inputData: { incidentId }, requestContext,
+      tracingOptions: { rootSpanName: `incident-analysis ${incidentId}`, metadata: { incidentId, jobId: lease.job.id, tenantId: lease.job.tenantId }, tags: ['incident-analysis'] },
+    });
+    if (result.status === 'success') return { type: 'complete' };
+    container.logger.warn('Incident analysis workflow failed; will retry', { incidentId, status: result.status });
+    return { type: 'reschedule', runAfter: container.clock.now() + 30_000, reason: 'incident analysis failed' };
+  };
+}
+
 export function createJobHandlers(container: Container, mastra: Mastra): Partial<Record<JobKind, JobHandler>> {
-  return { deliver_lead: deliverLeadHandler(container, mastra) };
+  return { deliver_lead: deliverLeadHandler(container, mastra), analyze_incident: analyzeIncidentHandler(container, mastra) };
 }

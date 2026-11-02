@@ -26,7 +26,7 @@ export interface Harness {
   sim: SimulatorAdminClient;
   tenants: Record<string, Tenant>;
   /** Runs jobs until none are runnable, jumping the clock to each scheduled retry. */
-  drain(opts?: { maxJobs?: number; horizonMs?: number }): Promise<number>;
+  drain(opts?: { maxJobs?: number; horizonMs?: number; kinds?: Array<'deliver_lead' | 'analyze_incident'> }): Promise<number>;
   submitLead(opts?: { tenant?: string; seed?: number; scenario?: ScenarioName }): Promise<{ leadId: string; webhook: { outcome: string } }>;
   contactsFor(tenant: string, leadId: string): Promise<Array<Record<string, unknown>>>;
   /** Runs the source-reconciliation workflow (manual trigger) against this harness. */
@@ -50,15 +50,16 @@ export async function createHarness(env: Record<string, string> = {}): Promise<H
   const mastra = createMastra({ config, storageUrl: `file:${path.join(config.dataDir, 'mastra.db')}`, workers: false });
   const runner = createJobRunner(container, mastra, { workerId: 'test-worker', concurrency: 1 });
 
-  const drain: Harness['drain'] = async ({ maxJobs = 100, horizonMs = 24 * 3600_000 } = {}) => {
+  const drain: Harness['drain'] = async ({ maxJobs = 100, horizonMs = 24 * 3600_000, kinds } = {}) => {
     let processed = 0;
     const start = clock.now();
     while (processed < maxJobs) {
-      if (await runner.runOnce()) {
+      if (await runner.runOnce(kinds)) {
         processed++;
         continue;
       }
-      const next = container.db.prepare("SELECT min(run_after) AS t FROM jobs WHERE status = 'queued'").get() as { t: number | null };
+      const kindSql = kinds?.length ? `AND kind IN (${kinds.map((k) => `'${k}'`).join(',')})` : '';
+      const next = container.db.prepare(`SELECT min(run_after) AS t FROM jobs WHERE status = 'queued' ${kindSql}`).get() as { t: number | null };
       const expired = container.db.prepare("SELECT min(lease_expires_at) AS t FROM jobs WHERE status = 'leased'").get() as { t: number | null };
       const t = Math.min(next.t ?? Infinity, expired.t !== null ? expired.t + 1 : Infinity);
       if (!Number.isFinite(t) || t - start > horizonMs) break;
