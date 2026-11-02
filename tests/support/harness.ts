@@ -1,7 +1,8 @@
 import path from 'node:path';
 import type { Mastra } from '@mastra/core/mastra';
 import { createWebhookApp } from '../../src/api/webhooks';
-import { createContainer, type Container } from '../../src/container';
+import { RequestContext } from '@mastra/core/request-context';
+import { CONTAINER_KEY, containerRef, createContainer, type Container } from '../../src/container';
 import type { Tenant } from '../../src/db/repositories/tenants';
 import { createJobRunner } from '../../src/jobs/create-runner';
 import type { JobRunner } from '../../src/jobs/runner';
@@ -28,6 +29,9 @@ export interface Harness {
   drain(opts?: { maxJobs?: number; horizonMs?: number }): Promise<number>;
   submitLead(opts?: { tenant?: string; seed?: number; scenario?: ScenarioName }): Promise<{ leadId: string; webhook: { outcome: string } }>;
   contactsFor(tenant: string, leadId: string): Promise<Array<Record<string, unknown>>>;
+  /** Runs the source-reconciliation workflow (manual trigger) against this harness. */
+  reconcile(tenantSlugs?: string[]): Promise<{ runId: string; status: string; [k: string]: unknown }>;
+  requestContext(): RequestContext;
   close(): Promise<void>;
 }
 
@@ -73,8 +77,20 @@ export async function createHarness(env: Record<string, string> = {}): Promise<H
     return { leadId: lead.id, webhook };
   };
 
+  const requestContext = () => {
+    const rc = new RequestContext();
+    rc.set(CONTAINER_KEY, containerRef(container));
+    return rc;
+  };
+  const reconcile: Harness['reconcile'] = async (tenantSlugs) => {
+    const run = await mastra.getWorkflow('sourceReconciliationWorkflow').createRun();
+    const res = await run.start({ inputData: { trigger: 'manual', ...(tenantSlugs ? { tenantSlugs } : {}) }, requestContext: requestContext() });
+    if (res.status !== 'success') throw new Error(`reconciliation workflow ${res.status}: ${JSON.stringify(res.status === 'failed' ? res.error?.message : '')}`);
+    return res.result as { runId: string; status: string };
+  };
+
   return {
-    container, mastra, runner, clock, sim, tenants, drain, submitLead,
+    container, mastra, runner, clock, sim, tenants, drain, submitLead, reconcile, requestContext,
     contactsFor: async (tenant, leadId) => (await sim.crmContacts(tenants[tenant]!.crmLocationId)).contacts.filter((c) => c.externalSourceId === leadId),
     close: async () => {
       await runner.stop(1_000);

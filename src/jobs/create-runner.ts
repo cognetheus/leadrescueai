@@ -9,7 +9,7 @@ export function workerId(prefix = 'worker'): string {
   return `${prefix}:${hostname().split('.')[0]}:${process.pid}:${randomBytes(3).toString('hex')}`;
 }
 
-export function createJobRunner(container: Container, mastra: Mastra, opts: { workerId?: string; concurrency?: number; leaseMs?: number } = {}): JobRunner {
+export function createJobRunner(container: Container, mastra: Mastra, opts: { workerId?: string; concurrency?: number; leaseMs?: number; listen?: boolean } = {}): JobRunner {
   const { config } = container;
   const runner = new JobRunner({
     queue: container.queue,
@@ -21,6 +21,6 @@ export function createJobRunner(container: Container, mastra: Mastra, opts: { wo
     logger: container.logger,
     now: () => container.clock.now(),
   });
-  container.jobListeners.add(() => runner.notify());
+  if (opts.listen !== false) container.jobListeners.add(() => runner.notify());
   return runner;
 }

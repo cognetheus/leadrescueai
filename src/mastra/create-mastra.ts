@@ -7,6 +7,7 @@ import { createMastraLogger } from '../shared/logger';
 import { deliveryRemediationWorkflow } from './workflows/delivery-remediation';
 import { leadDeliveryWorkflow } from './workflows/lead-delivery';
 import { platformHeartbeatWorkflow } from './workflows/platform-heartbeat';
+import { sourceReconciliationWorkflow } from './workflows/source-reconciliation';
 
 export interface MastraFactoryOptions {
   config: AppConfig;
@@ -19,6 +20,7 @@ export const workflows = {
   platformHeartbeatWorkflow,
   leadDeliveryWorkflow,
   deliveryRemediationWorkflow,
+  sourceReconciliationWorkflow,
 };
 
 /**

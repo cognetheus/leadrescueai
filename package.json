@@ -20,7 +20,8 @@
     "ollama:smoke": "tsx scripts/ollama-smoke.ts",
     "test:ollama": "RUN_OLLAMA_TESTS=1 vitest run tests/integration/*.ollama.test.ts",
     "sim": "tsx src/simulators/main.ts",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts",
+    "reconcile": "mastra api workflow run start sourceReconciliationWorkflow '{\"inputData\":{\"trigger\":\"manual\"}}'"
   },
   "dependencies": {
     "@hono/node-server": "1.19.18",
