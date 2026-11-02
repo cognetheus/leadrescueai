@@ -27,7 +27,7 @@ If evidence is insufficient, say so and use confidence "low".
 export const incidentAnalystAgent = new Agent({
   id: 'incident-analyst',
   name: 'Incident Analyst',
-  description: 'Explains lead-delivery incidents from recorded evidence using a local Ollama model. Read-only tools; advisory output.',
+  description: 'Explains lead-delivery incidents from recorded evidence using an Ollama model (Ollama Cloud by default). Read-only tools; advisory output.',
   instructions: INCIDENT_ANALYST_INSTRUCTIONS,
   // Resolved per request so no configuration is read at import time.
   model: ({ requestContext }) => ollamaModel(resolveContainer(requestContext).config),

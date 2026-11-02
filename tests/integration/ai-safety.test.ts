@@ -9,8 +9,8 @@ describe('AI hallucination protection and fallback (P06.03)', () => {
   let incidentId: string;
   const leads: Record<string, string> = {};
   beforeAll(async () => {
-    // AI enabled, but Ollama points at a closed port: the real analyst is unavailable.
-    h = await createHarness({ AI_ENABLED: 'true', OLLAMA_BASE_URL: 'http://127.0.0.1:1', OLLAMA_TIMEOUT_MS: '400' });
+    // AI enabled with an API key, but the LLM endpoint is a closed port: the real analyst is unavailable.
+    h = await createHarness({ AI_ENABLED: 'true', OLLAMA_API_KEY: 'test-key-123', OLLAMA_BASE_URL: 'http://127.0.0.1:1', OLLAMA_TIMEOUT_MS: '400' });
     for (const scenario of ['crm_503', 'revoked_refresh_token', 'timeout_after_commit', 'missing_required_field', 'verification_mismatch', 'expired_token'] as const) {
       leads[scenario] = (await h.submitLead({ tenant: scenario === 'revoked_refresh_token' ? 'summit-hvac' : 'acme-roofing', seed: 1100 + Object.keys(leads).length, scenario })).leadId;
     }

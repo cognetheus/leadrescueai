@@ -1,13 +1,13 @@
 /**
- * Local-model integration test. Runs only with RUN_OLLAMA_TESTS=1 and a running
- * Ollama daemon that has OLLAMA_MODEL pulled (see README).
+ * Live LLM integration test (Ollama Cloud by default). Runs only with RUN_OLLAMA_TESTS=1
+ * and a configured provider (OLLAMA_API_KEY for ollama-cloud). Spends a few cents of tokens.
  */
 import { Agent } from '@mastra/core/agent';
 import { describe, expect, it } from 'vitest';
 import { checkOllama, ollamaModel } from '../../src/ai/ollama';
 import { getConfig } from '../../src/config/env';
 
-describe('local Ollama inference', () => {
+describe('live Ollama inference', () => {
   const config = getConfig();
   it('is ready and answers through the Mastra model router', async () => {
     const status = await checkOllama(config);
@@ -18,12 +18,13 @@ describe('local Ollama inference', () => {
   }, 120_000);
 });
 
-describe('Incident Analyst agent with tools (live Ollama)', () => {
+describe('Incident Analyst agent with tools (live LLM)', () => {
   it('calls read-only tools for a real incident and cites recorded refs', async () => {
     const { createHarness } = await import('../support/harness');
     const { incidentAnalystAgent } = await import('../../src/mastra/agents/incident-analyst');
     const { INCIDENT_SCOPE_KEY } = await import('../../src/mastra/tools/incident-tools');
-    const h = await createHarness({ AI_ENABLED: 'true', OLLAMA_BASE_URL: getConfig().OLLAMA_BASE_URL, OLLAMA_MODEL: getConfig().OLLAMA_MODEL });
+    const { liveLlmEnv } = await import('../support/config');
+    const h = await createHarness(liveLlmEnv());
     try {
       const { leadId } = await h.submitLead({ seed: 991, scenario: 'crm_503' });
       await h.drain();

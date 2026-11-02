@@ -35,11 +35,11 @@ export function analysisPrompt(b: EvidenceBundle): string {
   ].join('\n');
 }
 
-/** The real generator: the Mastra Incident Analyst agent on local Ollama, with read-only tools. */
+/** The real generator: the Mastra Incident Analyst agent on the configured Ollama provider, with read-only tools. */
 export class AgentAssessmentGenerator implements AssessmentGenerator {
   readonly model: string;
   constructor(private mastra: Mastra, private config: AppConfig) {
-    this.model = `ollama/${config.OLLAMA_MODEL}`;
+    this.model = `${config.LLM_PROVIDER}/${config.OLLAMA_MODEL}`;
   }
 
   async generate(bundle: EvidenceBundle, opts: { signal: AbortSignal; requestContext: RequestContext }): Promise<unknown> {
@@ -48,7 +48,7 @@ export class AgentAssessmentGenerator implements AssessmentGenerator {
       requestContext: opts.requestContext,
       abortSignal: opts.signal,
       maxSteps: 6,
-      // qwen2.5 cannot combine tool calls with response_format; a second local pass structures the answer.
+      // Some models cannot combine tool calls with response_format; a second pass on the same model structures the answer.
       structuredOutput: { schema: IncidentAssessmentSchema, model: ollamaModel(this.config) },
     });
     return res.object;

@@ -37,7 +37,7 @@ Evidence lists the exact commands executed and their observed results.
   - `Mastra({ workers: MastraWorker[] })`: custom workers merge with default workers; used for the durable job runner.
   - `Mastra({ recovery: { workflows: 'off' } })`: disables Mastra's boot-time workflow restart. Job leases own crash recovery, so nothing executes twice.
   - `registerApiRoute(path, { method, handler, requiresAuth })`: custom HTTP routes on the Mastra (Hono) server.
-  - `OpenAICompatibleConfig { providerId, modelId, url }`: the model router has only `ollama-cloud` (remote, excluded), so local Ollama is reached through its OpenAI-compatible `/v1` endpoint.
+  - `OpenAICompatibleConfig { providerId, modelId, url, apiKey }`: used for both `ollama-cloud` (`https://ollama.com/v1`, the router's built-in provider) and a local daemon's `/v1` endpoint. (Originally local-only; see the decision log.)
   - Observability: `Observability` + `MastraStorageExporter`; LibSQL supports traces but **not** Studio's Metrics tab (requires DuckDB/ClickHouse). App-level metrics come from the application database instead.
 
 - Ollama: `qwen2.5:7b` cannot combine tool calls and `response_format` in one request (the tool was skipped and the JSON came back empty). Both documented workarounds were verified locally: a separate structuring `model` (3.4s, used by default) and `jsonPromptInjection: true` (1.6s). `deepseek-r1:7b` supports tools but is a reasoning model and too slow for incident triage. `gemma3` lacks tool support, and `*-cloud` models are remote; the probe rejects both.
@@ -73,3 +73,19 @@ Safety property asserted on every run: 100% of stored assessments are grounded (
 
 A probe (3 sequential real analyses, 30 s timeout) confirmed the timeout fires on schedule (30.0 s ±0.1 s, event-loop lag ≤32 ms), ruling out a code defect.
 Pending: a clean re-run on AC power with `caffeinate -i pnpm eval:ai`.
+
+## Decision log
+
+- **2026-11-02 — LLM provider switched to Ollama Cloud (user decision).** The original directive required local
+  inference with no cloud AI providers. The user chose Ollama Cloud instead, and this overrides that constraint.
+  - `LLM_PROVIDER=ollama-cloud` is the default (`gpt-oss:120b` at `https://ollama.com`, authenticated with `OLLAMA_API_KEY`).
+    `LLM_PROVIDER=ollama-local` remains supported.
+  - **Data sent to the cloud:** only the incident evidence bundle and read-only tool results. Both are PII-free by
+    construction (identifiers, statuses and error codes; no names, emails or phones), as enforced by `incident-tools.test.ts`.
+  - **Missing key:** the app still runs. The probe reports `not_configured`, readiness stays green, and incidents get
+    deterministic fallback assessments. The health probe spends no tokens: it checks the public `/api/tags` catalog for the
+    model and its `tools` capability. Only `pnpm ollama:smoke` proves the key works, with one inference call.
+  - **Verified:** against the real `ollama.com` catalog, `gpt-oss:120b` resolves to `ready` with
+    `["completion","tools","thinking"]`; without a key the smoke script reports `not_configured`. Full suite: 173 passed.
+  - **Not yet verified:** live cloud inference, `pnpm test:ollama` and `pnpm eval:ai`, all of which need an
+    `OLLAMA_API_KEY`. The AI evaluation log above was measured with the local `qwen2.5:7b` model.

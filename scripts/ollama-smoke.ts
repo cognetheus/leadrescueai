@@ -1,5 +1,6 @@
 /**
- * Real local inference check through Mastra's model router -> Ollama /v1.
+ * Real inference check through Mastra's model router -> the configured Ollama provider
+ * (Ollama Cloud by default). This is also the only check that proves the API key works.
  * Verifies plain generation, tool calling and structured output, the three
  * capabilities the Incident Analyst depends on.
  */
@@ -13,7 +14,8 @@ const config = getConfig();
 const status = await checkOllama(config);
 console.log('health:', JSON.stringify(status));
 if (status.state !== 'ready') {
-  console.error(`Ollama is not ready (${status.state}). Run: ollama pull ${config.OLLAMA_MODEL}`);
+  const hint = config.LLM_PROVIDER === 'ollama-cloud' ? 'Set OLLAMA_API_KEY in .env (https://ollama.com/settings/keys) and check OLLAMA_MODEL' : `Run: ollama pull ${config.OLLAMA_MODEL}`;
+  console.error(`LLM is not ready (${status.state}). ${hint}`);
   process.exit(1);
 }
 
@@ -48,8 +50,8 @@ const structured = await agent.generate(
     maxSteps: 4,
     structuredOutput: {
       schema: z.object({ deliveryId: z.string(), status: z.string(), attempts: z.number() }),
-      // qwen2.5 cannot combine tool calls with `response_format` in one request; a second
-      // local structuring pass (Mastra's documented workaround) keeps tool use intact.
+      // Some models cannot combine tool calls with `response_format` in one request; a second
+      // structuring pass (Mastra's documented workaround) keeps tool use intact.
       model: ollamaModel(config),
     },
   },

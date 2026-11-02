@@ -1,5 +1,5 @@
 /**
- * Local-model evaluation of the Incident Analyst (opt-in: `pnpm eval:ai`).
+ * Live-model evaluation of the Incident Analyst (opt-in: `pnpm eval:ai`; uses the configured provider).
  * Generates real incidents for several failure modes, runs the real Ollama analyst,
  * and reports quality metrics. The safety property (every stored assessment is grounded)
  * is asserted; model quality is reported, since it varies by local model.
@@ -11,14 +11,15 @@ import { getConfig } from '../../src/config/env';
 import { validateAssessment } from '../../src/services/assessment-validator';
 import { IncidentEvidenceService } from '../../src/services/incident-evidence';
 import { analyzeWith } from '../support/analysis';
+import { liveLlmEnv } from '../support/config';
 import { createHarness } from '../support/harness';
 
 const SCENARIOS = ['crm_503', 'timeout_after_commit', 'expired_token', 'missing_required_field', 'verification_mismatch', 'revoked_refresh_token'] as const;
 
-describe('Incident Analyst evaluation (live Ollama)', () => {
+describe('Incident Analyst evaluation (live LLM)', () => {
   it('produces grounded assessments across failure modes', async () => {
     const cfg = getConfig();
-    const h = await createHarness({ AI_ENABLED: 'true', OLLAMA_BASE_URL: cfg.OLLAMA_BASE_URL, OLLAMA_MODEL: cfg.OLLAMA_MODEL, OLLAMA_TIMEOUT_MS: '180000' });
+    const h = await createHarness({ ...liveLlmEnv(), OLLAMA_TIMEOUT_MS: '180000' });
     const rows: Array<Record<string, unknown>> = [];
     try {
       for (const [i, scenario] of SCENARIOS.entries()) {
@@ -45,6 +46,7 @@ describe('Incident Analyst evaluation (live Ollama)', () => {
     const ai = rows.filter((r) => r.source === 'ai');
     const latencies = rows.map((r) => Number(r.latencyMs)).sort((a, b) => a - b);
     const summary = {
+      provider: cfg.LLM_PROVIDER,
       model: cfg.OLLAMA_MODEL,
       runAt: new Date().toISOString(),
       incidents: rows.length,

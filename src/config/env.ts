@@ -23,8 +23,11 @@ const EnvSchema = z.object({
     .string()
     .refine((v) => Buffer.from(v, 'base64').length === 32, 'must be 32 bytes, base64-encoded'),
 
-  OLLAMA_BASE_URL: z.string().url().default('http://127.0.0.1:11434'),
-  OLLAMA_MODEL: z.string().min(1).default('qwen2.5:7b'),
+  /** `ollama-cloud` (default) calls ollama.com with an API key; `ollama-local` uses a local daemon. */
+  LLM_PROVIDER: z.enum(['ollama-cloud', 'ollama-local']).default('ollama-cloud'),
+  OLLAMA_API_KEY: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(8).optional()),
+  OLLAMA_BASE_URL: z.preprocess((v) => (v === '' ? undefined : v), z.string().url().optional()),
+  OLLAMA_MODEL: z.preprocess((v) => (v === '' ? undefined : v), z.string().min(1).optional()),
   OLLAMA_TIMEOUT_MS: z.coerce.number().int().positive().default(180_000),
   AI_ENABLED: bool.default(true),
   AI_ASSESS_RECOVERED: bool.default(true),
@@ -47,7 +50,15 @@ const EnvSchema = z.object({
 
 export type RawEnv = z.infer<typeof EnvSchema>;
 
-export interface AppConfig extends RawEnv {
+const PROVIDER_DEFAULTS = {
+  'ollama-cloud': { baseUrl: 'https://ollama.com', model: 'gpt-oss:120b' },
+  'ollama-local': { baseUrl: 'http://127.0.0.1:11434', model: 'qwen2.5:7b' },
+} as const;
+
+export interface AppConfig extends Omit<RawEnv, 'OLLAMA_BASE_URL' | 'OLLAMA_MODEL'> {
+  /** Resolved from LLM_PROVIDER defaults when not set explicitly. */
+  OLLAMA_BASE_URL: string;
+  OLLAMA_MODEL: string;
   rootDir: string;
   dataDir: string;
   appDbPath: string;
@@ -68,8 +79,11 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
   }
   const rootDir = findProjectRoot();
   const dataDir = resolveFromRoot(rootDir, env.DATA_DIR);
+  const defaults = PROVIDER_DEFAULTS[env.LLM_PROVIDER];
   return {
     ...env,
+    OLLAMA_BASE_URL: (env.OLLAMA_BASE_URL ?? defaults.baseUrl).replace(/\/$/, ''),
+    OLLAMA_MODEL: env.OLLAMA_MODEL ?? defaults.model,
     rootDir,
     dataDir,
     appDbPath: resolveFromRoot(dataDir, env.APP_DB_FILE),

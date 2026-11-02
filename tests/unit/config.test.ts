@@ -19,6 +19,12 @@ describe('configuration', () => {
     expect(cfg.AI_ENABLED).toBe(true);
   });
 
+  it('defaults to Ollama Cloud and resolves provider-specific defaults', () => {
+    expect(loadConfig({ ...base })).toMatchObject({ LLM_PROVIDER: 'ollama-cloud', OLLAMA_BASE_URL: 'https://ollama.com', OLLAMA_MODEL: 'gpt-oss:120b' });
+    expect(loadConfig({ ...base, LLM_PROVIDER: 'ollama-local' })).toMatchObject({ OLLAMA_BASE_URL: 'http://127.0.0.1:11434', OLLAMA_MODEL: 'qwen2.5:7b' });
+    expect(loadConfig({ ...base, OLLAMA_MODEL: 'kimi-k2.6', OLLAMA_API_KEY: '' })).toMatchObject({ OLLAMA_MODEL: 'kimi-k2.6', OLLAMA_API_KEY: undefined });
+  });
+
   it('rejects missing secrets and malformed keys with an actionable message', () => {
     expect(() => loadConfig({})).toThrow(/ADMIN_API_TOKEN/);
     expect(() => loadConfig({ ...base, CREDENTIALS_ENCRYPTION_KEY: 'short' })).toThrow(/32 bytes/);
