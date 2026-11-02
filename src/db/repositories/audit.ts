@@ -37,17 +37,17 @@ export class AuditRepository {
   }
 
   forEntity(entityType: string, entityId: string): AuditEvent[] {
-    return (this.db.prepare('SELECT * FROM audit_events WHERE entity_type = ? AND entity_id = ? ORDER BY created_at, id').all(entityType, entityId) as Row[]).map(map);
+    return (this.db.prepare('SELECT * FROM audit_events WHERE entity_type = ? AND entity_id = ? ORDER BY created_at, rowid').all(entityType, entityId) as Row[]).map(map);
   }
 
   forCorrelation(correlationId: string): AuditEvent[] {
-    return (this.db.prepare('SELECT * FROM audit_events WHERE correlation_id = ? ORDER BY created_at, id').all(correlationId) as Row[]).map(map);
+    return (this.db.prepare('SELECT * FROM audit_events WHERE correlation_id = ? ORDER BY created_at, rowid').all(correlationId) as Row[]).map(map);
   }
 
   recent(limit = 100, tenantId?: string): AuditEvent[] {
     const rows = tenantId
-      ? this.db.prepare('SELECT * FROM audit_events WHERE tenant_id = ? ORDER BY created_at DESC, id DESC LIMIT ?').all(tenantId, limit)
-      : this.db.prepare('SELECT * FROM audit_events ORDER BY created_at DESC, id DESC LIMIT ?').all(limit);
+      ? this.db.prepare('SELECT * FROM audit_events WHERE tenant_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?').all(tenantId, limit)
+      : this.db.prepare('SELECT * FROM audit_events ORDER BY created_at DESC, rowid DESC LIMIT ?').all(limit);
     return (rows as Row[]).map(map);
   }
 }

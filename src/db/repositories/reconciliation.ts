@@ -73,7 +73,7 @@ export class ReconciliationRepository {
   }
 
   listRuns(limit = 20): ReconciliationRun[] {
-    const ids = this.db.prepare('SELECT id FROM reconciliation_runs ORDER BY started_at DESC, id DESC LIMIT ?').all(limit) as Array<{ id: string }>;
+    const ids = this.db.prepare('SELECT id FROM reconciliation_runs ORDER BY started_at DESC, rowid DESC LIMIT ?').all(limit) as Array<{ id: string }>;
     return ids.map((r) => this.getRun(r.id)!);
   }
 
@@ -91,7 +91,7 @@ export class ReconciliationRepository {
     return this.db
       .prepare(
         `SELECT id, run_id AS runId, tenant_id AS tenantId, source_lead_id AS sourceLeadId, finding, action, delivery_id AS deliveryId, outcome, created_at AS createdAt
-         FROM reconciliation_findings WHERE run_id = ? ORDER BY created_at, id`,
+         FROM reconciliation_findings WHERE run_id = ? ORDER BY created_at, rowid`,
       )
       .all(runId) as Finding[];
   }
@@ -114,7 +114,7 @@ export class ScenarioRunRepository {
   }
 
   list(limit = 50): ScenarioRun[] {
-    const rows = this.db.prepare('SELECT * FROM fault_scenario_runs ORDER BY started_at DESC, id DESC LIMIT ?').all(limit) as Array<{
+    const rows = this.db.prepare('SELECT * FROM fault_scenario_runs ORDER BY started_at DESC, rowid DESC LIMIT ?').all(limit) as Array<{
       id: string; scenario: string; tenant_id: string; source_lead_id: string | null; expected_outcome: string; fault_rule_ids: string; started_at: number;
     }>;
     return rows.map((r) => ({

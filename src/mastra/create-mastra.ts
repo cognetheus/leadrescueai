@@ -4,6 +4,7 @@ import { LibSQLStore } from '@mastra/libsql';
 import { MastraStorageExporter, Observability, SensitiveDataFilter } from '@mastra/observability';
 import type { AppConfig } from '../config/env';
 import { createMastraLogger } from '../shared/logger';
+import { deliveryRemediationWorkflow } from './workflows/delivery-remediation';
 import { leadDeliveryWorkflow } from './workflows/lead-delivery';
 import { platformHeartbeatWorkflow } from './workflows/platform-heartbeat';
 
@@ -17,6 +18,7 @@ export interface MastraFactoryOptions {
 export const workflows = {
   platformHeartbeatWorkflow,
   leadDeliveryWorkflow,
+  deliveryRemediationWorkflow,
 };
 
 /**

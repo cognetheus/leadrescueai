@@ -125,7 +125,7 @@ export class IncidentRepository {
 
   events(incidentId: string): IncidentEvent[] {
     const rows = this.db
-      .prepare('SELECT id, incident_id, type, message, attempt_id, data_json, created_at FROM incident_events WHERE incident_id = ? ORDER BY created_at, id')
+      .prepare('SELECT id, incident_id, type, message, attempt_id, data_json, created_at FROM incident_events WHERE incident_id = ? ORDER BY created_at, rowid')
       .all(incidentId) as Array<{ id: string; incident_id: string; type: IncidentEventType; message: string; attempt_id: string | null; data_json: string | null; created_at: number }>;
     return rows.map((r) => ({
       id: r.id, incidentId: r.incident_id, type: r.type, message: r.message, attemptId: r.attempt_id,
@@ -146,7 +146,7 @@ export class IncidentRepository {
   }
 
   assessments(incidentId: string): StoredAssessment[] {
-    const rows = this.db.prepare('SELECT * FROM incident_assessments WHERE incident_id = ? ORDER BY created_at, id').all(incidentId) as Array<{
+    const rows = this.db.prepare('SELECT * FROM incident_assessments WHERE incident_id = ? ORDER BY created_at, rowid').all(incidentId) as Array<{
       id: string; incident_id: string; source: 'ai' | 'fallback'; model: string | null; assessment_json: string; policy_json: string;
       validation_issues_json: string; latency_ms: number; created_at: number;
     }>;

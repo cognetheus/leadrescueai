@@ -11,6 +11,7 @@ import { DeliveryPipeline } from './services/delivery-pipeline';
 import type { FailureHandler } from './services/failure-handler';
 import { IncidentService } from './services/incidents';
 import { WebhookIngestionService } from './services/ingestion';
+import { OperatorService } from './services/operator';
 import { RemediationService } from './services/remediation';
 import { TokenRefresher } from './services/token-refresher';
 import { systemClock, type Clock } from './shared/clock';
@@ -45,6 +46,7 @@ export interface Services {
   refresher: TokenRefresher;
   remediation: RemediationService;
   failureHandler: FailureHandler;
+  operator: OperatorService;
 }
 
 export interface ContainerOverrides {
@@ -78,7 +80,8 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
     repos, incidents, pipeline, refresher, clock, logger,
     policy: { maxAttempts: config.RETRY_MAX_ATTEMPTS, baseDelayMs: config.RETRY_BASE_DELAY_MS, maxDelayMs: config.RETRY_MAX_DELAY_MS, deadlineMs: config.DELIVERY_DEADLINE_MS },
   });
-  const services: Services = { source, crm, credentials, pipeline, incidents, refresher, remediation, failureHandler: remediation };
+  const operator = new OperatorService({ db, repos, queue, clock, deadlineMs: config.DELIVERY_DEADLINE_MS, onEnqueued: () => jobListeners.forEach((l) => l()) });
+  const services: Services = { source, crm, credentials, pipeline, incidents, refresher, remediation, failureHandler: remediation, operator };
   return { config, db, clock, logger, repos, queue, ingestion, jobListeners, services };
 }
 

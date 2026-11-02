@@ -3,6 +3,7 @@ import { RequestContext } from '@mastra/core/request-context';
 import { CONTAINER_KEY, containerRef, type Container } from '../container';
 import type { FailureEvidence } from '../domain/failure';
 import type { JobKind } from '../domain/job';
+import { REMEDIATION_KEY, remediationRuntimes } from '../mastra/workflows/delivery-remediation';
 import { ATTEMPT_KEY, attemptRuntimes, type AttemptRuntime } from '../mastra/workflows/lead-delivery';
 import type { AttemptContext } from '../services/delivery-pipeline';
 import type { JobHandler, JobOutcome, LeaseHandle } from './runner';
@@ -66,7 +67,33 @@ async function runAttempt(container: Container, mastra: Mastra, lease: LeaseHand
     occurredAt: new Date(container.clock.now()).toISOString(),
   };
   log.warn('Delivery attempt failed', { failureClass: failure.failureClass, code: failure.code, stage: failure.stage });
-  return container.services.failureHandler.handle(ctx, failure, runtime.lead);
+  return runRemediation(container, mastra, lease, runtime, failure);
+}
+
+/** Workflow B as its own Mastra run, so Studio shows each remediation decision next to the failed delivery run. */
+async function runRemediation(container: Container, mastra: Mastra, lease: LeaseHandle, runtime: AttemptRuntime, failure: FailureEvidence): Promise<JobOutcome> {
+  const { ctx } = runtime;
+  const key = remediationRuntimes.register({ ctx, failure, service: container.services.remediation, ...(runtime.lead ? { lead: runtime.lead } : {}) });
+  try {
+    const requestContext = new RequestContext();
+    requestContext.set(CONTAINER_KEY, containerRef(container));
+    requestContext.set(REMEDIATION_KEY, key);
+    const run = await mastra.getWorkflow('deliveryRemediationWorkflow').createRun({ runId: `${ctx.attempt.id}-remediation`, resourceId: ctx.tenant.id });
+    const trace = tracingFor(ctx, lease.job.id);
+    const result = await run.start({
+      inputData: { attemptId: ctx.attempt.id, deliveryId: ctx.delivery.id, tenantId: ctx.tenant.id, correlationId: ctx.delivery.correlationId },
+      requestContext,
+      tracingOptions: { ...trace, rootSpanName: `remediation ${ctx.tenant.slug}/${ctx.delivery.sourceLeadId} #${ctx.attempt.attemptNumber} (${failure.code})`, tags: ['delivery-remediation', ctx.tenant.slug] },
+    });
+    const outcome = remediationRuntimes.get(key)?.outcome;
+    if (result.status === 'success' && outcome) return outcome;
+    // Remediation itself broke before recording: leave the attempt running so the next claim
+    // marks it interrupted, and retry the whole delivery later (bounded by job claims).
+    container.logger.error('Remediation workflow did not complete', { deliveryId: ctx.delivery.id, status: result.status });
+    return { type: 'reschedule', runAfter: container.clock.now() + container.config.RETRY_BASE_DELAY_MS, reason: 'remediation workflow failed' };
+  } finally {
+    remediationRuntimes.release(key);
+  }
 }
 
 export function tracingFor(ctx: AttemptContext, jobId: string) {
