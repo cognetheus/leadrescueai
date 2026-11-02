@@ -13,6 +13,7 @@ export interface SimulatorOptions {
   baseUrl: string;
   now?: () => number;
   webhookTimeoutMs?: number;
+  allowReset?: boolean;
 }
 
 export function createSimulatorApp(opts: SimulatorOptions): { app: Hono; deps: SimulatorDeps } {
@@ -24,6 +25,7 @@ export function createSimulatorApp(opts: SimulatorOptions): { app: Hono; deps: S
     now,
     baseUrl: opts.baseUrl,
     webhookTimeoutMs: opts.webhookTimeoutMs ?? 5_000,
+    allowReset: opts.allowReset ?? false,
   };
   const app = new Hono();
   app.onError((err, c) => {

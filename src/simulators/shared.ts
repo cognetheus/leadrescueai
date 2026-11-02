@@ -11,6 +11,7 @@ export interface SimulatorDeps {
   /** Public base URL of the simulator itself (used in pagination `next` links). */
   baseUrl: string;
   webhookTimeoutMs: number;
+  allowReset: boolean;
 }
 
 export function safeEqual(a: string, b: string): boolean {

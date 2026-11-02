@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { resetSimulatorDb } from '../db';
 import { requireAdmin, type SimulatorDeps } from '../shared';
 import { FaultRuleInputSchema } from './engine';
 
@@ -8,6 +9,13 @@ export function createFaultAdminApp(deps: SimulatorDeps): Hono {
   app.use('/sim-admin/faults/*', requireAdmin(deps.adminToken));
   app.use('/sim-admin/faults', requireAdmin(deps.adminToken));
   app.use('/sim-admin/fault-events', requireAdmin(deps.adminToken));
+
+  /** Wipes all simulator data. Refused unless the simulator runs in a demo-capable environment. */
+  app.post('/sim-admin/reset', requireAdmin(deps.adminToken), (c) => {
+    if (!deps.allowReset) return c.json({ error: 'reset is disabled in this environment' }, 403);
+    resetSimulatorDb(deps.db);
+    return c.json({ reset: true });
+  });
 
   app.get('/sim-admin/faults', (c) => c.json({ rules: deps.faults.list() }));
   app.post('/sim-admin/faults', async (c) => {

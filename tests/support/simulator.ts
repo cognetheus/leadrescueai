@@ -8,7 +8,7 @@ export const SIM_ADMIN = 'test-sim-admin-token-0123456789';
 /** Runs the simulators on an ephemeral port against an in-memory database. */
 export async function startSimulator() {
   const db = openSimulatorDb(':memory:');
-  const { app, deps } = createSimulatorApp({ db, adminToken: SIM_ADMIN, baseUrl: 'http://placeholder', webhookTimeoutMs: 2_000 });
+  const { app, deps } = createSimulatorApp({ db, adminToken: SIM_ADMIN, baseUrl: 'http://placeholder', webhookTimeoutMs: 2_000, allowReset: true });
   const server = await startServer(app);
   deps.baseUrl = server.url;
   const admin = async (method: string, path: string, body?: unknown) => {
