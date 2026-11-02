@@ -3,8 +3,10 @@ import { getConfig, type AppConfig } from './config/env';
 import { openDatabase, type AppDatabase } from './db/connection';
 import { migrate } from './db/migrate';
 import { createRepositories, type Repositories } from './db/repositories';
-import { SecretBox } from './shared/crypto';
+import { JobQueue } from './jobs/queue';
+import { WebhookIngestionService } from './services/ingestion';
 import { systemClock, type Clock } from './shared/clock';
+import { SecretBox } from './shared/crypto';
 import { createAppLogger, createMastraLogger, type AppLogger } from './shared/logger';
 
 /**
@@ -18,6 +20,10 @@ export interface Container {
   clock: Clock;
   logger: AppLogger;
   repos: Repositories;
+  queue: JobQueue;
+  ingestion: WebhookIngestionService;
+  /** Listeners invoked after new jobs are committed (used to wake idle workers). */
+  jobListeners: Set<() => void>;
 }
 
 export interface ContainerOverrides {
@@ -35,7 +41,13 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
   migrate(db);
   const clock = overrides.clock ?? systemClock;
   const repos = createRepositories(db, clock, new SecretBox(config.CREDENTIALS_ENCRYPTION_KEY));
-  return { config, db, clock, logger, repos };
+  const queue = new JobQueue(db, clock);
+  const jobListeners = new Set<() => void>();
+  const ingestion = new WebhookIngestionService({
+    db, repos, queue, clock, logger, deliveryDeadlineMs: config.DELIVERY_DEADLINE_MS,
+    onEnqueued: () => jobListeners.forEach((l) => l()),
+  });
+  return { config, db, clock, logger, repos, queue, ingestion, jobListeners };
 }
 
 let defaultContainer: Container | undefined;

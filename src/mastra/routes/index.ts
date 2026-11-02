@@ -2,6 +2,7 @@ import { registerApiRoute } from '@mastra/core/server';
 import type { Hono } from 'hono';
 import { getContainer } from '../../container';
 import { createHealthApp } from '../../api/health';
+import { createWebhookApp } from '../../api/webhooks';
 
 /**
  * Application HTTP surfaces are plain Hono apps (testable without a Mastra server)
@@ -18,5 +19,10 @@ function mount(app: Hono, path: string, method: 'GET' | 'POST' | 'ALL') {
 
 export function buildApiRoutes() {
   const health = createHealthApp(getContainer);
-  return [mount(health, '/health/live', 'GET'), mount(health, '/health/ready', 'GET')];
+  const webhooks = createWebhookApp(() => getContainer().ingestion, () => getContainer().logger);
+  return [
+    mount(health, '/health/live', 'GET'),
+    mount(health, '/health/ready', 'GET'),
+    mount(webhooks, '/webhooks/meta/:tenantSlug', 'POST'),
+  ];
 }
