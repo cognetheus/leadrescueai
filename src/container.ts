@@ -6,12 +6,13 @@ import { createRepositories, type Repositories } from './db/repositories';
 import { JobQueue } from './jobs/queue';
 import { CrmClient } from './integrations/crm';
 import { MetaSourceClient } from './integrations/meta-source';
-import { BoundedRetryFailureHandler } from './services/bounded-retry-handler';
 import { CredentialService } from './services/credentials';
 import { DeliveryPipeline } from './services/delivery-pipeline';
 import type { FailureHandler } from './services/failure-handler';
 import { IncidentService } from './services/incidents';
 import { WebhookIngestionService } from './services/ingestion';
+import { RemediationService } from './services/remediation';
+import { TokenRefresher } from './services/token-refresher';
 import { systemClock, type Clock } from './shared/clock';
 import { SecretBox } from './shared/crypto';
 import { LocalRegistry } from './shared/local-registry';
@@ -41,6 +42,8 @@ export interface Services {
   credentials: CredentialService;
   pipeline: DeliveryPipeline;
   incidents: IncidentService;
+  refresher: TokenRefresher;
+  remediation: RemediationService;
   failureHandler: FailureHandler;
 }
 
@@ -70,10 +73,12 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
   const credentials = new CredentialService(repos);
   const pipeline = new DeliveryPipeline({ db, repos, clock, logger, source, crm, credentials, leaseHeld: (jobId, token) => queue.holdsLease(jobId, token) });
   const incidents = new IncidentService(repos, queue, { assessRecovered: config.AI_ASSESS_RECOVERED });
-  const failureHandler = new BoundedRetryFailureHandler(repos, incidents, clock, {
-    maxAttempts: config.RETRY_MAX_ATTEMPTS, baseDelayMs: config.RETRY_BASE_DELAY_MS, maxDelayMs: config.RETRY_MAX_DELAY_MS, deadlineMs: config.DELIVERY_DEADLINE_MS,
+  const refresher = new TokenRefresher(repos, crm, clock, logger);
+  const remediation = new RemediationService({
+    repos, incidents, pipeline, refresher, clock, logger,
+    policy: { maxAttempts: config.RETRY_MAX_ATTEMPTS, baseDelayMs: config.RETRY_BASE_DELAY_MS, maxDelayMs: config.RETRY_MAX_DELAY_MS, deadlineMs: config.DELIVERY_DEADLINE_MS },
   });
-  const services: Services = { source, crm, credentials, pipeline, incidents, failureHandler };
+  const services: Services = { source, crm, credentials, pipeline, incidents, refresher, remediation, failureHandler: remediation };
   return { config, db, clock, logger, repos, queue, ingestion, jobListeners, services };
 }
 

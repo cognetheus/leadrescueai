@@ -66,7 +66,7 @@ async function runAttempt(container: Container, mastra: Mastra, lease: LeaseHand
     occurredAt: new Date(container.clock.now()).toISOString(),
   };
   log.warn('Delivery attempt failed', { failureClass: failure.failureClass, code: failure.code, stage: failure.stage });
-  return container.services.failureHandler.handle(ctx, failure);
+  return container.services.failureHandler.handle(ctx, failure, runtime.lead);
 }
 
 export function tracingFor(ctx: AttemptContext, jobId: string) {

@@ -2,7 +2,8 @@ import type { AppDatabase } from '../db/connection';
 import type { Repositories } from '../db/repositories';
 import type { Delivery, DeliveryAttempt } from '../db/repositories/deliveries';
 import type { Tenant } from '../db/repositories/tenants';
-import { PipelineError, type PipelineStage } from '../domain/failure';
+import { PipelineError, type FailureEvidence, type PipelineStage } from '../domain/failure';
+import type { RemediationDecision } from '../domain/remediation';
 import { validateAndNormalizeLead, type NormalizedLead } from '../domain/lead';
 import type { CrmClient, CrmContact, NewCrmContact } from '../integrations/crm';
 import type { MetaSourceClient } from '../integrations/meta-source';
@@ -182,7 +183,7 @@ export class DeliveryPipeline {
   }
 
   /** Marks the delivery delivered. Fenced: a worker that lost its lease cannot commit. */
-  async commit(ctx: AttemptContext, contactId: string, origin: ContactOrigin): Promise<Delivery> {
+  async commit(ctx: AttemptContext, contactId: string, origin: ContactOrigin, recovered?: { failure: FailureEvidence; remediation: RemediationDecision }): Promise<Delivery> {
     return this.stage(ctx.attempt.id, 'commit', () => {
       const { repos, db } = this.deps;
       return db.transaction(() => {
@@ -191,11 +192,11 @@ export class DeliveryPipeline {
         const delivered = repos.deliveries.transition(ctx.delivery.id, ['processing'], 'delivered', {
           crmContactId: contactId, lastFailureClass: null, lastFailureCode: null,
         });
-        repos.attempts.finish(ctx.attempt.id, 'succeeded');
+        repos.attempts.finish(ctx.attempt.id, 'succeeded', recovered?.failure ?? null, recovered?.remediation ?? null);
         repos.audit.record({
           tenantId: ctx.tenant.id, actor: `worker:${ctx.attempt.workerId}`, action: 'delivery.delivered', entityType: 'delivery',
           entityId: ctx.delivery.id, correlationId: ctx.delivery.correlationId,
-          data: { attemptId: ctx.attempt.id, attemptNumber: ctx.attempt.attemptNumber, crmContactId: contactId, contactOrigin: origin },
+          data: { attemptId: ctx.attempt.id, attemptNumber: ctx.attempt.attemptNumber, crmContactId: contactId, contactOrigin: origin, recoveredBy: recovered?.remediation.action ?? null },
         });
         return delivered;
       }).immediate();
