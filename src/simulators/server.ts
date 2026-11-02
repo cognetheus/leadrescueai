@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { ZodError } from 'zod';
 import type { AppDatabase } from '../db/connection';
 import { FaultEngine } from './faults/engine';
+import { createCrmApp } from './crm/app';
 import { createFaultAdminApp } from './faults/admin-app';
 import { createMetaApp } from './meta/app';
 import type { SimulatorDeps } from './shared';
@@ -34,5 +35,6 @@ export function createSimulatorApp(opts: SimulatorOptions): { app: Hono; deps: S
   app.get('/health', (c) => c.json({ status: 'ok' }));
   app.route('/', createFaultAdminApp(deps));
   app.route('/', createMetaApp(deps));
+  app.route('/', createCrmApp(deps));
   return { app, deps };
 }
