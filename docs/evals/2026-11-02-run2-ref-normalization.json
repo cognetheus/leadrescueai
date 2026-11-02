@@ -1,0 +1,91 @@
+{
+  "summary": {
+    "model": "qwen2.5:7b",
+    "runAt": "2026-11-02T17:48:17.864Z",
+    "incidents": 6,
+    "aiAccepted": 3,
+    "aiAcceptanceRate": 0.5,
+    "fallbackRate": 0.5,
+    "policyAuthorizedRate": 1,
+    "meanCorrectionsWhenAccepted": 0,
+    "latencyMs": {
+      "p50": 91107,
+      "max": 183700
+    },
+    "groundedStored": "100% (asserted)"
+  },
+  "rows": [
+    {
+      "scenario": "crm_503",
+      "incidentStatus": "recovered",
+      "source": "fallback",
+      "latencyMs": 183700,
+      "corrections": null,
+      "rejectionReason": "generation failed: analysis timed out after 180000ms",
+      "proposed": "no_action_required",
+      "authorized": true,
+      "finalAction": "no_action_required",
+      "hypothesis": "The CRM or lead source API was temporarily unavailable."
+    },
+    {
+      "scenario": "timeout_after_commit",
+      "incidentStatus": "recovered",
+      "source": "ai",
+      "latencyMs": 42495,
+      "corrections": 0,
+      "rejectionReason": null,
+      "proposed": "no_action_required",
+      "authorized": true,
+      "finalAction": "no_action_required",
+      "hypothesis": "Contact creation outcome was unknown, leading to unclear write status."
+    },
+    {
+      "scenario": "expired_token",
+      "incidentStatus": "recovered",
+      "source": "ai",
+      "latencyMs": 46894,
+      "corrections": 0,
+      "rejectionReason": null,
+      "proposed": "no_action_required",
+      "authorized": true,
+      "finalAction": "no_action_required",
+      "hypothesis": "The crm access token was expired during the first delivery attempt, leading to the failure."
+    },
+    {
+      "scenario": "missing_required_field",
+      "incidentStatus": "escalated",
+      "source": "fallback",
+      "latencyMs": 97129,
+      "corrections": null,
+      "rejectionReason": "cites unknown evidence ref \"ref_in_01a19d5c6b5fef0dac04960dcfa59530\"",
+      "proposed": "correct_source_lead_data",
+      "authorized": true,
+      "finalAction": "correct_source_lead_data",
+      "hypothesis": "The lead was submitted at the source without the required contact information."
+    },
+    {
+      "scenario": "verification_mismatch",
+      "incidentStatus": "escalated",
+      "source": "ai",
+      "latencyMs": 67307,
+      "corrections": 0,
+      "rejectionReason": null,
+      "proposed": "investigate_crm_data_consistency",
+      "authorized": true,
+      "finalAction": "investigate_crm_data_consistency",
+      "hypothesis": "CRM record in the system does not match the lead’s email, making re-verifications unsuccessful."
+    },
+    {
+      "scenario": "revoked_refresh_token",
+      "incidentStatus": "escalated",
+      "source": "fallback",
+      "latencyMs": 91107,
+      "corrections": null,
+      "rejectionReason": "cites unknown evidence ref \"credential\"",
+      "proposed": "reauthorize_crm_connection",
+      "authorized": true,
+      "finalAction": "reauthorize_crm_connection",
+      "hypothesis": "The CRM connection was revoked (for example the app was uninstalled or re-authorized elsewhere)."
+    }
+  ]
+}

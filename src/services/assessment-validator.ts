@@ -2,7 +2,11 @@ import { IncidentAssessmentSchema, type IncidentAssessment } from '../domain/ass
 import { ID_PATTERN, type EvidenceBundle } from './incident-evidence';
 
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
-const PHONE = /(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/;
+/**
+ * Phone-shaped text: separated NANP numbers or E.164 with a leading '+'. Bare digit runs
+ * (lead ids, timestamps) are deliberately not matched, so citing a lead id is not a leak.
+ */
+const PHONE = /(?<![\w+])(?:\+?1[\s.-])?(?:\(\d{3}\)\s?|\d{3}[\s.-])\d{3}[\s.-]\d{4}(?!\d)|\+\d{10,15}(?!\d)/;
 
 export interface ValidationResult {
   /** Usable assessment (possibly corrected), or null when the output must be discarded. */
@@ -32,11 +36,20 @@ export function validateAssessment(raw: unknown, b: EvidenceBundle): ValidationR
 
   if (a.incidentId !== b.incident.ref) critical.push(`incidentId ${a.incidentId} does not match ${b.incident.ref}`);
 
+  // Refs are canonical lowercase identifiers; normalizing case/whitespace cannot invent a ref that is not in the evidence.
+  const normalize = (refs: string[]) =>
+    refs.map((ref) => {
+      const n = ref.trim().toLowerCase();
+      if (n !== ref) issues.push(`normalized evidence ref "${ref}" to "${n}"`);
+      return n;
+    });
+  for (const f of a.observedFacts) f.evidenceRefs = normalize(f.evidenceRefs);
+  a.rootCauseHypothesis.evidenceRefs = normalize(a.rootCauseHypothesis.evidenceRefs);
   const cited = [...a.observedFacts.flatMap((f) => f.evidenceRefs), ...a.rootCauseHypothesis.evidenceRefs];
   for (const ref of cited) if (!known.has(ref)) critical.push(`cites unknown evidence ref "${ref}"`);
 
   const text = [...a.observedFacts.map((f) => f.statement), a.rootCauseHypothesis.statement, a.operatorInstructions].join('\n');
-  for (const m of text.matchAll(ID_PATTERN)) if (!known.has(m[0])) critical.push(`mentions identifier "${m[0]}" that is not in the evidence`);
+  for (const m of text.toLowerCase().matchAll(ID_PATTERN)) if (!known.has(m[0])) critical.push(`mentions identifier "${m[0]}" that is not in the evidence`);
   if (EMAIL.test(text)) critical.push('contains an email address');
   if (PHONE.test(text)) critical.push('contains a phone number');
 

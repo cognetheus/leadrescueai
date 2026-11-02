@@ -25,6 +25,7 @@ Evidence lists the exact commands executed and their observed results.
 | P05 | P05.03 Duplicate prevention and reconciliation verification | ✅ Done | `reconciliation-duplicates.test.ts` 5/5 passed 4× consecutively: late webhook racing a backfill → 1 delivery/1 contact; two concurrent reconciliation runs → no duplicates; backfill hitting CRM 503 reported `backfillPending`, next run sees it in flight (no re-backfill), worker completes it once; escalated leads reported, not re-driven; 36-lead paginated scan (page size 7) with 12 lost webhooks → all 12 backfilled and verified, every lead exactly one contact. Full suite 144/144 |
 | P06 | P06.01 Ollama Incident Analyst and read-only tools | ✅ Done | `IncidentEvidenceService` (deterministic evidence bundle with citable refs, no PII), 5 read-only Mastra tools with per-analysis incident scoping, `incident-analyst` agent (Ollama via request-scoped model) registered with Mastra/Studio. `incident-tools.test.ts` 4/4 (tools leave app DB, credentials, jobs and CRM unchanged; out-of-scope read refused; no email/phone/token in outputs). Live `pnpm test:ollama` 2/2: qwen2.5:7b called the tools on a real CRM-503 incident and cited recorded refs |
 | P06 | P06.02 Structured assessments and policy validation | ✅ Done | Workflow D `incident-analysis` (gather-evidence → generate-assessment → validate-grounding → authorize-action → persist-assessment) run by the `analyze_incident` job; Zod contract + grounding validator (unknown refs, invented ids, contact data, wrong incident ⇒ discard; recorded facts corrected); deterministic policy engine for operator actions; deterministic fallback assessments. `incident-assessment.test.ts` 4/4. Live on the running server: real CRM-503 incident analyzed by `ollama/qwen2.5:7b` in 56 s (async), `source=ai`, 0 corrections, suggestion policy-authorized. **Note:** commit `56074ce` was made before the full suite finished and 2 tests in `remediation-audit.test.ts` were failing (they predated incident analysis and didn't expect the `assessment_fallback` event that now follows closure). Fixed in the next commit; full suite 152/152 |
+| P06 | P06.03 AI evaluation, hallucination protection, fallback | ✅ Done (eval re-run pending on AC power) | `ai-safety.test.ts` 10/10: with AI enabled but Ollama unreachable all deliveries completed and every closed incident got a grounded fallback; output citing unknown refs, inventing ids, leaking email/phone, about another incident, outside the allowlist, or unstructured → discarded for fallback; model error and hang (timeout 400 ms) → fallback in <5 s; every stored assessment re-validated as grounded. Validator fixes found by tests/evals: phone detection no longer flags lead ids/timestamps (regression cases added); evidence-ref casing normalized (cannot invent refs). Prompt now lists citable refs; default `OLLAMA_TIMEOUT_MS` raised to 180 s (analysis is async). Live `pnpm eval:ai` (qwen2.5:7b, 6 scenarios): see `docs/evals/` — see AI evaluation log below |
 
 ## Framework verification log
 
@@ -59,3 +60,16 @@ Evidence lists the exact commands executed and their observed results.
 - **Containment:** exposure was limited to the gitignored local `data/` directory with secrets generated in this
   session. All local databases were wiped, every secret was regenerated (`pnpm setup:env --force`), tenants were re-seeded,
   and a post-fix live run was scanned clean.
+
+## AI evaluation log (`pnpm eval:ai`, qwen2.5:7b, 6 incident scenarios)
+
+Safety property asserted on every run: 100% of stored assessments are grounded (re-validated against recorded evidence).
+
+| Run | Change under test | AI accepted | Policy authorized | Notes |
+|-----|-------------------|-------------|-------------------|-------|
+| 1 | baseline | 5/6 | 5/6 | 0 corrections on accepted; one upper-cased ref (`INE_…`) rejected; policy overrode `reauthorize_crm_connection` → `correct_source_lead_data` for a missing-field lead |
+| 2 | ref normalization | 3/6 | 6/6 | 2 genuinely invented refs (`ref_in_…`, `credential`) rejected; 1 timeout at 180 s; host on battery |
+| 3 | citable-ref list in prompt | — | — | **Invalid:** macOS power log shows the host slept 484 s mid-run (battery 33%); wall-clock latencies 536–586 s. Kept as `docs/evals/2026-11-02-run3-INVALID-host-slept-484s.json` |
+
+A probe (3 sequential real analyses, 30 s timeout) confirmed the timeout fires on schedule (30.0 s ±0.1 s, event-loop lag ≤32 ms), ruling out a code defect.
+Pending: a clean re-run on AC power with `caffeinate -i pnpm eval:ai`.

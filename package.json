@@ -18,10 +18,11 @@
     "dev:mastra": "mastra dev --dir src/mastra",
     "build:mastra": "mastra build --dir src/mastra",
     "ollama:smoke": "tsx scripts/ollama-smoke.ts",
-    "test:ollama": "RUN_OLLAMA_TESTS=1 vitest run tests/integration/*.ollama.test.ts",
+    "test:ollama": "RUN_OLLAMA_TESTS=1 vitest run tests/integration/ollama-live.ollama.test.ts",
     "sim": "tsx src/simulators/main.ts",
     "seed": "tsx scripts/seed.ts",
-    "reconcile": "mastra api workflow run start sourceReconciliationWorkflow '{\"inputData\":{\"trigger\":\"manual\"}}'"
+    "reconcile": "mastra api workflow run start sourceReconciliationWorkflow '{\"inputData\":{\"trigger\":\"manual\"}}'",
+    "eval:ai": "RUN_OLLAMA_TESTS=1 vitest run tests/eval"
   },
   "dependencies": {
     "@hono/node-server": "1.19.18",

@@ -27,8 +27,10 @@ export function analysisPrompt(b: EvidenceBundle): string {
   };
   return [
     `Assess incident ${b.incident.ref}. Use your read-only tools to confirm details.`,
-    'Evidence digest (refs are the only identifiers you may cite):',
+    'Evidence digest:',
     JSON.stringify(digest),
+    `Citable evidence refs (copy exactly; anything else is rejected): ${JSON.stringify(b.refs)}`,
+    'Use only these strings in evidenceRefs. Do not cite field names, words or shortened ids.',
     `Return the structured assessment for incidentId "${b.incident.ref}".`,
   ].join('\n');
 }

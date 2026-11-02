@@ -96,3 +96,26 @@ describe('backoff', () => {
     expect(backoffDelay(policy, 1, 'dlv_2')).not.toBe(d(1)); // jitter spreads deliveries
   });
 });
+
+describe('contact-data detection in assessments', async () => {
+  const { validateAssessment } = await import('../../src/services/assessment-validator');
+  const bundle = {
+    incident: { ref: 'inc_0123456789abcdef', kind: 'delivery_failure', status: 'recovered', severity: 'low', title: 't', failureClass: 'transient', failureCode: 'x', tenant: 't', openedAt: '', closedAt: '' },
+    delivery: null, timeline: [], attempts: [], credential: null, crm: null, actionsPerformed: [], refs: ['inc_0123456789abcdef'],
+  } as never;
+  const withText = (operatorInstructions: string) => ({
+    incidentId: 'inc_0123456789abcdef', observedFacts: [{ statement: 'Recovered.', evidenceRefs: ['inc_0123456789abcdef'] }],
+    rootCauseHypothesis: { statement: 'Outage.', confidence: 'low', evidenceRefs: ['inc_0123456789abcdef'] },
+    recoveryActionsPerformed: [], recoveryOutcome: 'recovered', suggestedAction: 'monitor', severity: 'low', requiresHuman: false, operatorInstructions,
+  });
+  it.each([
+    ['Lead 2000000001100 recovered at 1793638109412.', false],
+    ['Retry at 2026-11-02T16:48:29.395Z after HTTP 503.', false],
+    ['Call (512) 555-0199 now.', true],
+    ['Call 512-555-0199 now.', true],
+    ['Text +15125550199 now.', true],
+    ['Email jane@example.com now.', true],
+  ])('%s -> leak=%s', (text, leak) => {
+    expect(validateAssessment(withText(text), bundle).critical).toBe(leak);
+  });
+});
