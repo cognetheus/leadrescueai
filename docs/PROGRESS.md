@@ -87,5 +87,24 @@ Pending: a clean re-run on AC power with `caffeinate -i pnpm eval:ai`.
     model and its `tools` capability. Only `pnpm ollama:smoke` proves the key works, with one inference call.
   - **Verified:** against the real `ollama.com` catalog, `gpt-oss:120b` resolves to `ready` with
     `["completion","tools","thinking"]`; without a key the smoke script reports `not_configured`. Full suite: 173 passed.
-  - **Not yet verified:** live cloud inference, `pnpm test:ollama` and `pnpm eval:ai`, all of which need an
-    `OLLAMA_API_KEY`. The AI evaluation log above was measured with the local `qwen2.5:7b` model.
+  - **Live cloud inference verified** (under Docker Compose, below): a CRM-503 incident was assessed by
+    `ollama-cloud/gpt-oss:120b` in 11.5 s, `source=ai`, 0 corrections, suggestion policy-authorized.
+    `pnpm eval:ai` has not been re-run on the cloud model yet; the evaluation log above is for local `qwen2.5:7b`.
+
+- **2026-11-02 — Docker Compose setup (`docker compose up --build`).** One image (`Dockerfile`), four services:
+  `init` (generates secrets once into the `config` volume), `simulators` (healthchecked), `seed` (idempotent tenant
+  provisioning), `app` (production `mastra build --studio`: API, Studio, job worker, cron scheduler; healthchecked
+  on `/health/ready`). Ports bound to 127.0.0.1 only (Studio has no login). An optional `./.env` (e.g.
+  `OLLAMA_API_KEY`) is layered over the generated secrets; container-network values in `compose.yaml` win.
+  - Issues found and fixed while verifying:
+    1. `mastra build` reinstalls dependencies from the registry, which **dropped the @mastra/core patch**.
+       `scripts/patch-mastra-output.mjs` now re-applies it to the build output and fails the build if it cannot.
+    2. Docker Desktop DNS was flaky (`EAI_AGAIN nodejs.org`), so the `better-sqlite3` source fallback failed. The build now
+       compiles against the image's bundled Node headers (`npm_config_nodedir`), retries harder and caches the pnpm store.
+    3. Four services tagging one image raced ("already exists"). Each service now builds the same Dockerfile, and BuildKit dedupes it.
+    4. Compose's `env_file` parser reads `KEY=   # comment` (empty value plus inline comment) as the comment text.
+       Comments moved to their own lines in `.env.example`.
+  - Verified with `docker compose up --build`: init → simulators healthy → seed (2 tenants, webhooks → `http://app:4111`)
+    → app healthy; Studio 200; `/api/observability/traces/light` 200 (patch present); schedule active; healthy lead
+    delivered on attempt 1; CRM-503 lead delivered on attempt 3 (retry, retry) with an Ollama Cloud assessment.
+    After `docker compose down` and another `up --build`, secrets were kept, data persisted, and a new lead was delivered.

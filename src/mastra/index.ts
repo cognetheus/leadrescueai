@@ -16,7 +16,8 @@ export const mastra = new Mastra({
   }),
   server: {
     port: 4111,
-    host: 'localhost',
+    // Containers set MASTRA_HOST=0.0.0.0; local runs stay on loopback.
+    host: process.env.MASTRA_HOST ?? 'localhost',
     apiRoutes: buildApiRoutes(),
   },
   bundler: {

@@ -1,0 +1,80 @@
+# LeadRescue AI — full local stack:  docker compose up --build
+#
+#   Studio + API   http://localhost:4111
+#   Simulators     http://localhost:4200   (fake Meta Lead Ads + CRM)
+#
+# Secrets are generated once into the `config` volume by `init`. An optional ./.env is
+# layered on top (e.g. OLLAMA_API_KEY for the Incident Analyst); values under
+# `environment:` below always win because they describe the container network.
+
+name: leadrescue
+
+x-app: &app
+  # Every service builds the same Dockerfile; BuildKit runs the identical steps once and the
+  # resulting images share all layers. (A shared `image:` tag would race between services.)
+  build: .
+  env_file:
+    - path: .env
+      required: false
+  environment: &env
+    ENV_FILE: /config/secrets.env
+    APP_ENV: demo
+    DATA_DIR: /app/data
+    SIMULATOR_BASE_URL: http://simulators:4200
+    APP_PUBLIC_URL: http://app:4111
+    STUDIO_URL: http://localhost:4111
+  volumes:
+    - config:/config
+    - data:/app/data
+
+services:
+  init:
+    <<: *app
+    command: ["node_modules/.bin/tsx", "scripts/setup-env.ts", "--out", "/config/secrets.env"]
+    restart: "no"
+
+  simulators:
+    <<: *app
+    command: ["node_modules/.bin/tsx", "src/simulators/main.ts"]
+    environment:
+      <<: *env
+      SIMULATOR_HOST: 0.0.0.0
+    ports: ["127.0.0.1:4200:4200"]
+    depends_on:
+      init: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4200/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  seed:
+    <<: *app
+    command: ["node_modules/.bin/tsx", "scripts/seed.ts"]
+    depends_on:
+      simulators: { condition: service_healthy }
+    restart: "no"
+
+  app:
+    <<: *app
+    command: ["node", ".mastra/output/index.mjs"]
+    environment:
+      <<: *env
+      MASTRA_HOST: 0.0.0.0
+      MASTRA_STUDIO_PATH: .mastra/output/studio
+    # Bound to localhost only: Studio has no login in this demo setup.
+    ports: ["127.0.0.1:4111:4111"]
+    depends_on:
+      seed: { condition: service_completed_successfully }
+      simulators: { condition: service_healthy }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:4111/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    restart: unless-stopped
+
+volumes:
+  config:
+  data:

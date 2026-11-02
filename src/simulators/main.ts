@@ -10,8 +10,10 @@ const { app } = createSimulatorApp({ db, adminToken: config.SIMULATOR_ADMIN_TOKE
   allowReset: config.APP_ENV !== 'production',
 });
 
-const server = serve({ fetch: app.fetch, port: config.SIMULATOR_PORT, hostname: '127.0.0.1' }, (info) => {
-  console.log(`[simulators] Meta Lead Ads + CRM simulators listening on http://127.0.0.1:${info.port} (db: ${config.simulatorDbPath})`);
+// Containers set SIMULATOR_HOST=0.0.0.0; local runs stay on loopback.
+const hostname = process.env.SIMULATOR_HOST ?? '127.0.0.1';
+const server = serve({ fetch: app.fetch, port: config.SIMULATOR_PORT, hostname }, (info) => {
+  console.log(`[simulators] Meta Lead Ads + CRM simulators listening on http://${hostname}:${info.port} (db: ${config.simulatorDbPath})`);
 });
 
 for (const signal of ['SIGINT', 'SIGTERM'] as const) {

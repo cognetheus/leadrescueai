@@ -16,13 +16,14 @@
     "test:watch": "vitest",
     "verify": "pnpm typecheck && pnpm lint && pnpm test",
     "dev:mastra": "mastra dev --dir src/mastra",
-    "build:mastra": "mastra build --dir src/mastra",
+    "build:mastra": "mastra build --dir src/mastra --studio && node scripts/patch-mastra-output.mjs",
     "ollama:smoke": "tsx scripts/ollama-smoke.ts",
     "test:ollama": "RUN_OLLAMA_TESTS=1 vitest run tests/integration/ollama-live.ollama.test.ts",
     "sim": "tsx src/simulators/main.ts",
     "seed": "tsx scripts/seed.ts",
     "reconcile": "mastra api workflow run start sourceReconciliationWorkflow '{\"inputData\":{\"trigger\":\"manual\"}}'",
-    "eval:ai": "RUN_OLLAMA_TESTS=1 vitest run tests/eval"
+    "eval:ai": "RUN_OLLAMA_TESTS=1 vitest run tests/eval",
+    "start:mastra": "MASTRA_STUDIO_PATH=.mastra/output/studio node .mastra/output/index.mjs"
   },
   "dependencies": {
     "@hono/node-server": "1.19.18",

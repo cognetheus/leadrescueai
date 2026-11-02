@@ -1,0 +1,13 @@
+node_modules
+.mastra
+data
+.env
+.env.*
+!.env.example
+.git
+.agents
+.claude
+coverage
+dashboard/dist
+docs/evals
+*.log
