@@ -4,9 +4,17 @@ import { openDatabase, type AppDatabase } from './db/connection';
 import { migrate } from './db/migrate';
 import { createRepositories, type Repositories } from './db/repositories';
 import { JobQueue } from './jobs/queue';
+import { CrmClient } from './integrations/crm';
+import { MetaSourceClient } from './integrations/meta-source';
+import { BoundedRetryFailureHandler } from './services/bounded-retry-handler';
+import { CredentialService } from './services/credentials';
+import { DeliveryPipeline } from './services/delivery-pipeline';
+import type { FailureHandler } from './services/failure-handler';
+import { IncidentService } from './services/incidents';
 import { WebhookIngestionService } from './services/ingestion';
 import { systemClock, type Clock } from './shared/clock';
 import { SecretBox } from './shared/crypto';
+import { LocalRegistry } from './shared/local-registry';
 import { createAppLogger, createMastraLogger, type AppLogger } from './shared/logger';
 
 /**
@@ -24,6 +32,16 @@ export interface Container {
   ingestion: WebhookIngestionService;
   /** Listeners invoked after new jobs are committed (used to wake idle workers). */
   jobListeners: Set<() => void>;
+  services: Services;
+}
+
+export interface Services {
+  source: MetaSourceClient;
+  crm: CrmClient;
+  credentials: CredentialService;
+  pipeline: DeliveryPipeline;
+  incidents: IncidentService;
+  failureHandler: FailureHandler;
 }
 
 export interface ContainerOverrides {
@@ -47,7 +65,16 @@ export function createContainer(overrides: ContainerOverrides = {}): Container {
     db, repos, queue, clock, logger, deliveryDeadlineMs: config.DELIVERY_DEADLINE_MS,
     onEnqueued: () => jobListeners.forEach((l) => l()),
   });
-  return { config, db, clock, logger, repos, queue, ingestion, jobListeners };
+  const source = new MetaSourceClient(config.SIMULATOR_BASE_URL, config.HTTP_TIMEOUT_MS);
+  const crm = new CrmClient(config.SIMULATOR_BASE_URL, config.HTTP_TIMEOUT_MS);
+  const credentials = new CredentialService(repos);
+  const pipeline = new DeliveryPipeline({ db, repos, clock, logger, source, crm, credentials });
+  const incidents = new IncidentService(repos, queue, { assessRecovered: config.AI_ASSESS_RECOVERED });
+  const failureHandler = new BoundedRetryFailureHandler(repos, incidents, clock, {
+    maxAttempts: config.RETRY_MAX_ATTEMPTS, baseDelayMs: config.RETRY_BASE_DELAY_MS, maxDelayMs: config.RETRY_MAX_DELAY_MS, deadlineMs: config.DELIVERY_DEADLINE_MS,
+  });
+  const services: Services = { source, crm, credentials, pipeline, incidents, failureHandler };
+  return { config, db, clock, logger, repos, queue, ingestion, jobListeners, services };
 }
 
 let defaultContainer: Container | undefined;
@@ -61,10 +88,22 @@ export function setDefaultContainer(container: Container | undefined): void {
   defaultContainer = container;
 }
 
-export const CONTAINER_KEY = 'leadrescue.container';
+export const CONTAINER_KEY = 'leadrescue.containerRef';
 
-/** Steps prefer a container passed through the request context (tests, workers) over the process default. */
+const containers = new LocalRegistry<Container>();
+const containerKeys = new WeakMap<Container, string>();
+
+/** Opaque, serializable reference to a container, safe to place in a RequestContext. */
+export function containerRef(container: Container): string {
+  let key = containerKeys.get(container);
+  if (!key) {
+    key = containers.register(container);
+    containerKeys.set(container, key);
+  }
+  return key;
+}
+
+/** Steps prefer a container referenced by the request context (tests, workers) over the process default. */
 export function resolveContainer(requestContext?: RequestContext): Container {
-  const fromContext = requestContext?.get(CONTAINER_KEY) as Container | undefined;
-  return fromContext ?? getContainer();
+  return containers.get(requestContext?.get(CONTAINER_KEY)) ?? getContainer();
 }

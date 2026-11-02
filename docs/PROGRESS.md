@@ -15,6 +15,7 @@ Evidence lists the exact commands executed and their observed results.
 | P02 | P02.02 CRM simulator | ✅ Done | GoHighLevel-style simulator: location-scoped expiring access tokens, rotating refresh tokens with reuse detection (family revocation), contact create/search/get, no built-in dedupe (as real CRMs), 401/403/404/422 semantics; faults: http_error (Retry-After), timeout_after_commit, mutate_field (stale read); `CrmClient` with Zod-validated responses; `crm-simulator.test.ts` 8/8 passed |
 | P02 | P02.03 Fault injection and fixture generation | ✅ Done | 12 deterministic, lead-scoped scenario plans (all 11 required + partial source read), scenario installer, seeded fixture generator (reserved 555-01xx / example.com data), simulator admin client, guarded reset, idempotent tenant provisioning; `fault-scenarios.test.ts` 5/5 passed; `pnpm seed` run twice against the live simulator: 2 tenants, credentials encrypted (no plaintext token in ciphertext), CRM re-install bumped version |
 | P03 | P03.01 Secure webhook ingestion and durable acceptance | ✅ Done | Constant-time HMAC-SHA256 over raw bytes, envelope + page-ownership validation, 256 KB limit, single IMMEDIATE transaction (event + idempotent delivery + job + audit) before 200, 503 when commit fails; `webhook-ingestion.test.ts` 6/6 passed (5 signature attack variants rejected with nothing persisted, duplicates → 1 delivery/1 job, forced commit failure → 503 with full rollback); live: simulator lead → signed webhook → Mastra route `/webhooks/meta/acme-roofing` → `pending` delivery + queued job in `data/leadrescue.db` |
+| P03 | P03.02 Mastra lead-processing workflow | ✅ Done | `lead-delivery` workflow (fetch → validate/normalize → idempotency → find → branch[use-existing \| create] → read-back → verify → lease-fenced commit) driven by the durable job handler (run id = attempt id, tracing metadata: tenant/lead/delivery/attempt/correlation); deterministic failure classifier; bounded durable retries; incident timelines; `LeadJobWorker` registered as a Mastra worker. `lead-delivery-workflow.test.ts` 2/2 passed (all 8 stages success in the persisted snapshot; audit order; full `mastra.db`+WAL byte scan finds no email/phone/tokens/keys). Live: embedded worker in `mastra dev` delivered a simulator lead (`delivered`, CRM contact linked) |
 
 ## Framework verification log
 
@@ -36,3 +37,16 @@ Evidence lists the exact commands executed and their observed results.
 - **Studio trace list crash (`stored.trim is not a function`)**: `@mastra/libsql@1.28.0`'s generic row loader JSON-parses any string that starts with `{`, which turns stored span previews such as `{"requestedBy":"x"}` into objects. `@mastra/core@1.81.0`'s `lightPreview()` then calls `.trim()` on them, and `GET /api/observability/traces/light` (used by Studio) returns 500.
   Fix: `patches/@mastra__core@1.81.0.patch` (applied via `pnpm.patchedDependencies`) stringifies non-string previews. Verified: the endpoint returned 500 before the patch and 200 after it. Remove the patch when upgrading Mastra.
 - `@mastra/deployer` depends on `@hono/node-ws`, which requires `@hono/node-server@^1.19`, so the simulators pin `@hono/node-server@1.19.18` to avoid two server copies.
+
+## Security incident during development (P03.02) — found, fixed, rotated
+
+- **What:** Mastra persists a run's `RequestContext` into the workflow snapshot. The first implementation placed the
+  container object (whose config holds `ADMIN_API_TOKEN` and `CREDENTIALS_ENCRYPTION_KEY`) and the unmasked lead in the
+  request context, so one live dev run wrote them to `data/mastra.db`.
+- **Detection:** the P03.02 integration test asserting "no raw customer data in Mastra state" failed.
+- **Fix:** live objects never enter the request context; only opaque string keys resolved through a process-local
+  registry (`src/shared/local-registry.ts`). The test now byte-scans the whole Mastra database (and WAL) for customer
+  email/phone, provider tokens, app secret, admin token and encryption key.
+- **Containment:** exposure was limited to the gitignored local `data/` directory with secrets generated in this
+  session. All local databases were wiped, every secret was regenerated (`pnpm setup:env --force`), tenants were re-seeded,
+  and a post-fix live run was scanned clean.

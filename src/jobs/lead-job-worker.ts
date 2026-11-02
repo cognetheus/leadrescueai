@@ -1,3 +1,4 @@
+import type { Mastra } from '@mastra/core/mastra';
 import { MastraWorker, type WorkerStopOptions } from '@mastra/core/worker';
 import type { JobRunner } from './runner';
 
@@ -11,12 +12,13 @@ export class LeadJobWorker extends MastraWorker {
   readonly name = 'leadrescue-jobs';
   private runner: JobRunner | null = null;
 
-  constructor(private readonly createRunner: () => JobRunner) {
+  constructor(private readonly createRunner: (mastra: Mastra) => JobRunner) {
     super();
   }
 
   async start(): Promise<void> {
-    this.runner ??= this.createRunner();
+    if (!this.mastra) throw new Error('LeadJobWorker must be registered on a Mastra instance');
+    this.runner ??= this.createRunner(this.mastra);
     this.runner.start();
   }
 

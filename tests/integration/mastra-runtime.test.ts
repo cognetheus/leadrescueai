@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { RequestContext } from '@mastra/core/request-context';
-import { CONTAINER_KEY, createContainer } from '../../src/container';
+import { CONTAINER_KEY, containerRef, createContainer } from '../../src/container';
 import { createMastra } from '../../src/mastra/create-mastra';
 import { silentLogger } from '../../src/shared/logger';
 import { testConfig } from '../support/config';
@@ -17,7 +17,7 @@ describe('Mastra runtime (P00.02)', () => {
 
   it('runs the baseline workflow against the app database and persists run + trace', async () => {
     const requestContext = new RequestContext();
-    requestContext.set(CONTAINER_KEY, container);
+    requestContext.set(CONTAINER_KEY, containerRef(container));
     const run = await mastra.getWorkflow('platformHeartbeatWorkflow').createRun();
     const result = await run.start({ inputData: { requestedBy: 'vitest' }, requestContext });
 
