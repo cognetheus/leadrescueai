@@ -8,6 +8,7 @@ Evidence lists the exact commands executed and their observed results.
 | P00 | P00.01 Repository and TypeScript foundation | ✅ Done | `tsc --noEmit` clean; `eslint .` clean; `vitest run` 5/5 passed (config validation, redaction, ids) |
 | P00 | P00.02 Mastra, Studio, persistence, baseline workflow | ✅ Done | `mastra dev` served Studio (HTTP 200) and listed `platformHeartbeatWorkflow`; runs started through the API (`mastra api workflow run start`) and from a separate tsx process (`scripts/smoke-heartbeat.ts`) both appeared in the dev server's run list and trace store; `better-sqlite3` loads inside the Mastra bundle (`bundler.externals`); integration test `mastra-runtime.test.ts` passed (run snapshot + spans persisted to LibSQL) |
 | P00 | P00.03 Ollama integration, configuration, health checks | ✅ Done | Pulled local `qwen2.5:7b` (tools capability). `pnpm ollama:smoke` PASS: plain generation ("pong"), tool call (1 call) and schema-validated structured output through Mastra's router; `pnpm test:ollama` 1/1 passed; probe/health unit tests 9/9; live `GET /health/ready` on the Mastra server returned `ai.state=ready`, `required:false` |
+| P01 | P01.01 Domain models and contracts | ✅ Done | Pure domain modules (lead contract + normalization, delivery state machine, failure taxonomy, remediation/operator action allowlists, incidents, jobs, Zod assessment contract); `domain.test.ts` 18 tests passed, including no-fabrication and illegal-transition cases; tsc/eslint clean |
 
 ## Framework verification log
 
