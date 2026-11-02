@@ -18,7 +18,8 @@
     "dev:mastra": "mastra dev --dir src/mastra",
     "build:mastra": "mastra build --dir src/mastra",
     "ollama:smoke": "tsx scripts/ollama-smoke.ts",
-    "test:ollama": "RUN_OLLAMA_TESTS=1 vitest run tests/integration/*.ollama.test.ts"
+    "test:ollama": "RUN_OLLAMA_TESTS=1 vitest run tests/integration/*.ollama.test.ts",
+    "sim": "tsx src/simulators/main.ts"
   },
   "dependencies": {
     "@hono/node-server": "1.19.18",
