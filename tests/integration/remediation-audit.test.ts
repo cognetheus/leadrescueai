@@ -21,6 +21,8 @@ describe('verification, escalation and recovery audit trail (P04.03)', () => {
       'detected', 'classified', 'remediation_selected', 'remediation_executed', 'retry_scheduled',
       'classified', 'remediation_selected', 'remediation_executed', 'retry_scheduled',
       'verification_passed', 'recovered',
+      // The asynchronous incident analysis runs after closure (AI disabled in tests → deterministic assessment).
+      'assessment_fallback',
     ]);
     const audit = h.container.repos.audit.forEntity('delivery', d.id).map((a) => a.action);
     expect(audit.filter((a) => a === 'remediation.retry_with_backoff')).toHaveLength(2);
@@ -51,9 +53,11 @@ describe('verification, escalation and recovery audit trail (P04.03)', () => {
     const [incident] = h.container.repos.incidents.forDelivery(d.id);
     expect(incident).toMatchObject({ status: 'escalated', severity: 'critical' });
     const events = h.container.repos.incidents.events(incident!.id);
-    expect(events.at(-1)).toMatchObject({ type: 'escalated' });
-    expect(events.at(-1)!.message).toMatch(/re-authorize/);
-    expect(h.container.queue.list().some((j) => j.kind === 'analyze_incident' && (j.payload as { incidentId: string }).incidentId === incident!.id)).toBe(true);
+    const escalatedEvent = events.findLast((e) => e.type === 'escalated')!;
+    expect(escalatedEvent.message).toMatch(/re-authorize/);
+    expect(events.at(-1)).toMatchObject({ type: 'assessment_fallback' }); // analysis requested and completed after escalation
+    expect(h.container.queue.list().some((j) => j.kind === 'analyze_incident' && (j.payload as { incidentId: string }).incidentId === incident!.id && j.status === 'succeeded')).toBe(true);
+    expect(h.container.repos.incidents.assessments(incident!.id)[0]!.assessment.suggestedAction).toBe('reauthorize_crm_connection');
     expect(h.container.repos.audit.forEntity('delivery', d.id).map((a) => a.action)).toContain('remediation.refresh_token_and_retry');
   });
 
