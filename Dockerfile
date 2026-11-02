@@ -27,8 +27,9 @@ RUN --mount=type=cache,id=leadrescue-pnpm,target=/pnpm/store pnpm build:mastra
 
 FROM base AS runtime
 ENV NODE_ENV=production
-COPY --from=build /app /app
-RUN mkdir -p /app/data /config && chown -R node:node /app/data /config
+# Owned by the unprivileged runtime user (tools such as vitest write temp files next to their config).
+COPY --from=build --chown=node:node /app /app
+RUN mkdir -p /app/data /config && chown node:node /app/data /config
 USER node
 EXPOSE 4111 4200
 CMD ["node", ".mastra/output/index.mjs"]

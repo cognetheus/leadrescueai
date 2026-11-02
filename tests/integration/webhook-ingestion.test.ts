@@ -76,7 +76,8 @@ describe('webhook ingestion (P03.01)', () => {
     const cases = [
       await post(acme.slug, body),
       await post(acme.slug, body, 'sha1=deadbeef'),
-      await post(acme.slug, body, sign(secretA, body).replace(/.$/, '0')),
+      // Flip the last hex digit so the signature always differs (replacing it with a fixed '0' was a no-op 1 in 16 runs).
+      await post(acme.slug, body, sign(secretA, body).replace(/.$/, (c) => (c === '0' ? '1' : '0'))),
       await post(acme.slug, body.replace('6001', '6002'), sign(secretA, body)),
       await post(acme.slug, body, sign(secretB, body)), // signed by another tenant's secret
     ];

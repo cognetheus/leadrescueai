@@ -60,6 +60,9 @@ pnpm test         # full suite, no LLM or servers needed
 pnpm verify       # typecheck + lint + tests
 pnpm ollama:smoke # one live LLM call (needs OLLAMA_API_KEY)
 pnpm eval:ai      # live Incident Analyst evaluation across failure scenarios
+
+# Or without Node on the host, inside the image:
+docker compose run --rm --no-deps app node_modules/.bin/vitest run
 ```
 
 Implementation status and verification evidence: [docs/PROGRESS.md](docs/PROGRESS.md).
