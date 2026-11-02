@@ -1,0 +1,10 @@
+node_modules/
+.mastra/
+dist/
+data/*
+!data/.gitkeep
+.env
+*.log
+coverage/
+dashboard/dist/
+.DS_Store
