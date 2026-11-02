@@ -4,6 +4,7 @@ import { LibSQLStore } from '@mastra/libsql';
 import { MastraStorageExporter, Observability, SensitiveDataFilter } from '@mastra/observability';
 import type { AppConfig } from '../config/env';
 import { createMastraLogger } from '../shared/logger';
+import { incidentAnalystAgent } from './agents/incident-analyst';
 import { deliveryRemediationWorkflow } from './workflows/delivery-remediation';
 import { leadDeliveryWorkflow } from './workflows/lead-delivery';
 import { platformHeartbeatWorkflow } from './workflows/platform-heartbeat';
@@ -31,6 +32,7 @@ export function mastraOptions(opts: MastraFactoryOptions) {
   const { config } = opts;
   return {
     workflows,
+    agents: { incidentAnalystAgent },
     storage: new LibSQLStore({ id: 'leadrescue-mastra', url: opts.storageUrl ?? config.mastraDbUrl }),
     logger: createMastraLogger(config.LOG_LEVEL),
     observability: new Observability({
